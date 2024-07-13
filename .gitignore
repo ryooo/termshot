@@ -1,2 +1,4 @@
 dist
 **/*.coverprofile
+.DS_Store
+out.png

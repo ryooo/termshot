@@ -27,13 +27,18 @@ import (
 	"io"
 	"math"
 	"strings"
+  "fmt"
+	"unicode"
+	"bytes"
 
+	"github.com/nfnt/resize"
 	"github.com/esimov/stackblur-go"
 	"github.com/fogleman/gg"
 	"github.com/golang/freetype/truetype"
 	"github.com/gonvenience/bunt"
 	"github.com/gonvenience/term"
 	"github.com/homeport/termshot/internal/fonts"
+	noto "github.com/homeport/termshot/internal/noto"
 	"golang.org/x/image/font"
 )
 
@@ -225,6 +230,7 @@ func (s *Scaffold) image() (image.Image, error) {
 	// Apply the actual text into the prepared content area of the window
 	//
 	var x, y float64 = xOffset + paddingX, yOffset + paddingY + titleOffset + s.fontHeight()
+
 	for _, cr := range s.content {
 		switch cr.Settings & 0x1C {
 		case 4:
@@ -283,7 +289,14 @@ func (s *Scaffold) image() (image.Image, error) {
 			str = "×"
 		}
 
-		dc.DrawString(str, x, y)
+		emoji, err := GetEmoji(str)
+		if err == nil {
+			dc.SetRGB255(255, 255, 255);
+			dc.DrawImage(emoji, int(x), int(y) - 40)
+			x += 25
+		} else {
+			dc.DrawString(str, x, y)
+		}
 
 		// There seems to be no font face based way to do an underlined
 		// string, therefore manually draw a line under each character
@@ -297,6 +310,23 @@ func (s *Scaffold) image() (image.Image, error) {
 	}
 
 	return dc.Image(), nil
+}
+
+func GetEmoji(s string) (image.Image, error ) {
+
+	// Convert the string to a rune to get the Unicode code point
+	r := []rune(s)[0]
+	if unicode.IsDigit([]rune(s)[0]) || s == "#" {
+		return nil, fmt.Errorf("input string is a digit")
+	}
+	var err error
+	path := fmt.Sprintf("png/72/emoji_u%.4x.png", r)
+	imgData, err := noto.Images.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	emoji, _, err := image.Decode(bytes.NewReader(imgData))
+	return resize.Resize(50, 0, emoji, resize.Lanczos3), nil
 }
 
 func (s *Scaffold) Write(w io.Writer) error {
